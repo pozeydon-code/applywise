@@ -1,7 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+
+const PIPELINE_STEPS = [
+  "Parseando CV",
+  "Analizando oferta laboral",
+  "Evaluando compatibilidad",
+  "Generando assets de carrera",
+];
+
+type AnalysisSummary = {
+  id: string;
+  created_at: string;
+  job_role: string | null;
+  score: number;
+};
 
 export default function HomePage() {
   const router = useRouter();
@@ -9,6 +23,15 @@ export default function HomePage() {
   const [jobDescription, setJobDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [recentAnalyses, setRecentAnalyses] = useState<AnalysisSummary[]>([]);
+
+  useEffect(() => {
+    fetch("/api/analyses")
+      .then((r) => r.json())
+      .then((d) => setRecentAnalyses(d.analyses ?? []))
+      .catch(() => {});
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -16,6 +39,7 @@ export default function HomePage() {
 
     setIsLoading(true);
     setError(null);
+    setCurrentStep(0);
 
     try {
       const formData = new FormData();
@@ -23,26 +47,74 @@ export default function HomePage() {
       formData.append("jobDescription", jobDescription);
 
       const res = await fetch("/api/analyze", { method: "POST", body: formData });
-      const data = await res.json();
 
       if (!res.ok) {
+        const data = await res.json();
         setError(data.error ?? "Ocurrió un error al analizar el CV.");
         return;
       }
 
-      sessionStorage.setItem("analysisResult", JSON.stringify(data));
-      router.push("/analyze");
+      const contentType = res.headers.get("content-type") ?? "";
+
+      if (contentType.includes("text/event-stream")) {
+        const reader = res.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const chunks = buffer.split("\n\n");
+          buffer = chunks.pop() ?? "";
+
+          for (const chunk of chunks) {
+            const line = chunk.trim();
+            if (!line.startsWith("data: ")) continue;
+
+            const payload = JSON.parse(line.slice(6));
+
+            if (payload.type === "progress") {
+              setCurrentStep(payload.step);
+            } else if (payload.type === "result") {
+              sessionStorage.setItem("analysisResult", JSON.stringify(payload.data));
+              router.push("/analyze");
+              return;
+            } else if (payload.type === "error") {
+              setError(payload.message);
+              return;
+            }
+          }
+        }
+      } else {
+        // JSON fallback — used by E2E mocks (page.route interception)
+        const data = await res.json();
+        sessionStorage.setItem("analysisResult", JSON.stringify(data));
+        router.push("/analyze");
+      }
     } catch {
       setError("No se pudo conectar con el servidor. Intentá de nuevo.");
     } finally {
       setIsLoading(false);
+      setCurrentStep(0);
     }
+  }
+
+  function scoreColor(score: number) {
+    if (score >= 70) return "text-emerald-400";
+    if (score >= 50) return "text-yellow-400";
+    return "text-red-400";
+  }
+
+  function formatDate(iso: string) {
+    return new Intl.DateTimeFormat("es-AR", { dateStyle: "medium" }).format(new Date(iso));
   }
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center p-6">
-      <div className="w-full max-w-2xl">
-        <header className="mb-10 text-center">
+      <div className="w-full max-w-2xl space-y-6">
+        <header className="text-center">
           <h1 className="text-4xl font-bold text-white tracking-tight">
             Apply<span className="text-emerald-400">Wise</span>
           </h1>
@@ -57,16 +129,13 @@ export default function HomePage() {
         >
           {/* PDF Upload */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-300">
-              CV en PDF
-            </label>
+            <label className="block text-sm font-medium text-slate-300">CV en PDF</label>
             <div
-              className={`
-                relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors
-                ${pdfFile
+              className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
+                pdfFile
                   ? "border-emerald-500 bg-emerald-500/10"
-                  : "border-slate-600 hover:border-slate-500 bg-slate-900/40"}
-              `}
+                  : "border-slate-600 hover:border-slate-500 bg-slate-900/40"
+              }`}
             >
               <input
                 type="file"
@@ -104,9 +173,42 @@ export default function HomePage() {
             />
           </div>
 
+          {/* Pipeline progress */}
+          {isLoading && currentStep > 0 && (
+            <div className="space-y-2 py-1">
+              {PIPELINE_STEPS.map((label, i) => {
+                const step = i + 1;
+                const done = currentStep > step;
+                const active = currentStep === step;
+                return (
+                  <div
+                    key={step}
+                    className={`flex items-center gap-3 text-sm transition-colors ${
+                      done
+                        ? "text-emerald-400"
+                        : active
+                        ? "text-white"
+                        : "text-slate-600"
+                    }`}
+                  >
+                    <span className="w-4 flex-shrink-0 flex items-center justify-center font-mono">
+                      {done ? "✓" : active ? (
+                        <span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : "·"}
+                    </span>
+                    {label}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Error */}
           {error && (
-            <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm">
+            <div
+              role="alert"
+              className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm"
+            >
               {error}
             </div>
           )}
@@ -117,11 +219,13 @@ export default function HomePage() {
             disabled={!pdfFile || !jobDescription.trim() || isLoading}
             className="w-full py-3 px-6 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold rounded-xl transition-colors duration-200 flex items-center justify-center gap-2"
           >
-            {isLoading ? (
+            {isLoading && currentStep === 0 ? (
               <>
                 <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Analizando con IA local...
+                Iniciando análisis...
               </>
+            ) : isLoading ? (
+              "Analizando con IA local..."
             ) : (
               "Analizar CV"
             )}
@@ -131,6 +235,30 @@ export default function HomePage() {
             Tu CV se procesa localmente. No se envía a servicios externos de IA.
           </p>
         </form>
+
+        {/* Recent analyses from Supabase */}
+        {recentAnalyses.length > 0 && (
+          <section className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6">
+            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
+              Análisis recientes
+            </h2>
+            <ul className="space-y-3">
+              {recentAnalyses.slice(0, 5).map((a) => (
+                <li key={a.id} className="flex items-center justify-between gap-4">
+                  <span className="text-slate-300 text-sm truncate">
+                    {a.job_role ?? "Puesto sin nombre"}
+                  </span>
+                  <div className="flex items-center gap-4 flex-shrink-0">
+                    <span className={`font-semibold text-sm ${scoreColor(a.score)}`}>
+                      {a.score}%
+                    </span>
+                    <span className="text-slate-500 text-xs">{formatDate(a.created_at)}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
     </main>
   );

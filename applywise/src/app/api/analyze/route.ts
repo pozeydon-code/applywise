@@ -10,6 +10,34 @@ import type { AnalysisResult } from "@/shared/types/domain";
 
 export const maxDuration = 120;
 
+type SseEvent =
+  | { type: "progress"; step: number; total: number; label: string }
+  | { type: "result"; data: AnalysisResult }
+  | { type: "error"; message: string };
+
+function sseStream(handler: (emit: (event: SseEvent) => void) => Promise<void>): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      function emit(event: SseEvent) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+      }
+      try {
+        await handler(emit);
+      } finally {
+        controller.close();
+      }
+    },
+  });
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
+}
+
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
   const pdfFile = formData.get("cv") as File | null;
@@ -30,7 +58,6 @@ export async function POST(req: NextRequest) {
   }
 
   const ai = getAiProvider();
-
   const isHealthy = await ai.healthCheck();
   if (!isHealthy) {
     return NextResponse.json(
@@ -39,51 +66,54 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Step 1: Normalize CV
-  const cvProfile = await ai.generateJson({
-    prompt: buildCvNormalizationPrompt(pdfResult.text),
-    systemPrompt: SYSTEM_NO_FABRICATION,
-    schema: CvProfileSchema,
-    maxTokens: 2048,
+  return sseStream(async (emit) => {
+    try {
+      emit({ type: "progress", step: 1, total: 4, label: "Parseando CV..." });
+      const cvProfile = await ai.generateJson({
+        prompt: buildCvNormalizationPrompt(pdfResult.text),
+        systemPrompt: SYSTEM_NO_FABRICATION,
+        schema: CvProfileSchema,
+        maxTokens: 2048,
+      });
+
+      emit({ type: "progress", step: 2, total: 4, label: "Analizando oferta laboral..." });
+      const jobOffer = await ai.generateJson({
+        prompt: buildJobOfferAnalysisPrompt(jobDescription),
+        systemPrompt: SYSTEM_NO_FABRICATION,
+        schema: JobOfferSchema,
+        maxTokens: 1024,
+      });
+
+      emit({ type: "progress", step: 3, total: 4, label: "Evaluando compatibilidad..." });
+      const matchAnalysis = await ai.generateJson({
+        prompt: buildMatchPrompt(cvProfile, jobOffer),
+        systemPrompt: SYSTEM_NO_FABRICATION,
+        schema: MatchAnalysisSchema,
+        maxTokens: 1024,
+      });
+
+      emit({ type: "progress", step: 4, total: 4, label: "Generando assets de carrera..." });
+      const generatedAssets = await ai.generateJson({
+        prompt: buildAssetsPrompt(cvProfile, jobOffer, matchAnalysis),
+        systemPrompt: SYSTEM_NO_FABRICATION,
+        schema: GeneratedAssetsSchema,
+        maxTokens: 2048,
+      });
+
+      const result: AnalysisResult = { cvProfile, jobOffer, matchAnalysis, generatedAssets };
+
+      const saved = await saveAnalysis(result);
+      if (saved?.id) {
+        result.id = saved.id;
+        result.createdAt = saved.created_at;
+      }
+
+      emit({ type: "result", data: result });
+    } catch (err) {
+      emit({
+        type: "error",
+        message: err instanceof Error ? err.message : "Error desconocido en el análisis.",
+      });
+    }
   });
-
-  // Step 2: Analyze job offer
-  const jobOffer = await ai.generateJson({
-    prompt: buildJobOfferAnalysisPrompt(jobDescription),
-    systemPrompt: SYSTEM_NO_FABRICATION,
-    schema: JobOfferSchema,
-    maxTokens: 1024,
-  });
-
-  // Step 3: Match CV vs job offer
-  const matchAnalysis = await ai.generateJson({
-    prompt: buildMatchPrompt(cvProfile, jobOffer),
-    systemPrompt: SYSTEM_NO_FABRICATION,
-    schema: MatchAnalysisSchema,
-    maxTokens: 1024,
-  });
-
-  // Step 4: Generate assets
-  const generatedAssets = await ai.generateJson({
-    prompt: buildAssetsPrompt(cvProfile, jobOffer, matchAnalysis),
-    systemPrompt: SYSTEM_NO_FABRICATION,
-    schema: GeneratedAssetsSchema,
-    maxTokens: 2048,
-  });
-
-  const result: AnalysisResult = {
-    cvProfile,
-    jobOffer,
-    matchAnalysis,
-    generatedAssets,
-  };
-
-  // Step 5: Persist minimal metadata (non-blocking — failure doesn't break the response)
-  const saved = await saveAnalysis(result);
-  if (saved?.id) {
-    result.id = saved.id;
-    result.createdAt = saved.created_at;
-  }
-
-  return NextResponse.json(result);
 }

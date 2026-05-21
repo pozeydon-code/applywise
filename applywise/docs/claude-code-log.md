@@ -4,6 +4,36 @@ Evidence log for the "Uso de Claude Code" rubric criterion.
 
 ---
 
+## Session 5 — 2026-05-21
+
+**Prompt / task summary:**
+Agregar pipeline progress visible (SSE) e historial de análisis recientes desde Supabase para mejorar demo y score en rúbrica.
+
+**What Claude Code helped with:**
+- Convertió `/api/analyze` a Server-Sent Events (SSE): emite eventos de progreso `{ type: "progress", step, label }` después de cada una de las 4 etapas del pipeline, y `{ type: "result", data }` al finalizar.
+- Agregó helper `sseStream()` para encapsular la creación del `ReadableStream` con headers correctos (`text/event-stream`, `no-cache`, `keep-alive`).
+- Actualizó `page.tsx` para leer el stream SSE con `fetch + body.getReader()`: muestra los 4 pasos con estado (pendiente / activo / completado) en tiempo real mientras el modelo corre.
+- Mantiene fallback JSON para E2E mocks (Playwright `page.route` devuelve `application/json`, el frontend detecta por `Content-Type` y no intenta leer stream).
+- Agregó sección "Análisis recientes" en la landing: `useEffect` fetcha `GET /api/analyses` al montar y muestra los últimos 5 análisis con rol, score (color según umbral), y fecha formateada en es-AR.
+- Corrigió el CI workflow: el archivo estaba en `applywise/.github/` (no en la raíz del repo) y nunca se commiteó. Movido a `.github/workflows/ci.yml` en la raíz con `defaults.run.working-directory: applywise`.
+
+**Files changed:**
+- `src/app/api/analyze/route.ts` — convertido a SSE con helper `sseStream` y eventos de progreso por etapa
+- `src/app/page.tsx` — SSE reader, pipeline progress UI (4 pasos animados), sección "Análisis recientes"
+- `docs/claude-code-log.md` — esta entrada
+- `.github/workflows/ci.yml` — movido a raíz del repo con `working-directory: applywise`
+
+**Decisions made:**
+- SSE sobre polling: el cliente mantiene una conexión abierta y recibe eventos push — sin requests extras ni timers.
+- Fallback JSON por Content-Type: los mocks de E2E devuelven `application/json`, el frontend lo detecta y parsea normalmente sin tocar el stream. Cero cambios en tests.
+- `sseStream()` como helper en el mismo archivo del route: encapsula el boilerplate de ReadableStream sin crear una abstracción prematura.
+
+**Next step:**
+- Commit y push.
+- Demo final: mostrar el pipeline en vivo con los 4 pasos animados y el historial de Supabase.
+
+---
+
 ## Session 4 — 2026-05-21
 
 **Prompt / task summary:**
