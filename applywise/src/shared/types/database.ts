@@ -10,6 +10,7 @@ export type Database = {
           job_role: string | null;
           score: number;
           result_snapshot: AnalysisResult;
+          user_id: string | null;
         };
         Insert: {
           id?: string;
@@ -17,6 +18,7 @@ export type Database = {
           job_role?: string | null;
           score: number;
           result_snapshot: AnalysisResult;
+          user_id?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["analyses"]["Insert"]>;
         Relationships: [];

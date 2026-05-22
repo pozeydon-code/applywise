@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { extractTextFromPdf } from "@/server/pdf/extract";
 import { getAiProvider } from "@/server/ai";
 import { saveAnalysis } from "@/server/persistence/analyses";
+import { createSupabaseServerClient } from "@/server/supabase/server";
 import { CvProfileSchema, JobOfferSchema, MatchAnalysisSchema, GeneratedAssetsSchema } from "@/shared/schemas/ai-outputs";
 import { buildCvNormalizationPrompt, buildJobOfferAnalysisPrompt, SYSTEM_NO_FABRICATION } from "@/features/cv-analysis/prompts";
 import { buildMatchPrompt } from "@/features/job-matching/prompts";
@@ -39,6 +40,13 @@ function sseStream(handler: (emit: (event: SseEvent) => void) => Promise<void>):
 }
 
 export async function POST(req: NextRequest) {
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "No autenticado." }, { status: 401 });
+  }
+
   const formData = await req.formData();
   const pdfFile = formData.get("cv") as File | null;
   const jobDescription = formData.get("jobDescription") as string | null;
@@ -102,7 +110,7 @@ export async function POST(req: NextRequest) {
 
       const result: AnalysisResult = { cvProfile, jobOffer, matchAnalysis, generatedAssets };
 
-      const saved = await saveAnalysis(result);
+      const saved = await saveAnalysis(result, user.id);
       if (saved?.id) {
         result.id = saved.id;
         result.createdAt = saved.created_at;

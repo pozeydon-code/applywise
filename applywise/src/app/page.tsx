@@ -25,6 +25,7 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [recentAnalyses, setRecentAnalyses] = useState<AnalysisSummary[]>([]);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/analyses")
@@ -105,6 +106,21 @@ export default function HomePage() {
     if (score >= 70) return "text-emerald-400";
     if (score >= 50) return "text-yellow-400";
     return "text-red-400";
+  }
+
+  async function openAnalysis(id: string) {
+    setLoadingId(id);
+    try {
+      const res = await fetch(`/api/analyses/${id}`);
+      if (!res.ok) return;
+      const { analysis } = await res.json();
+      sessionStorage.setItem("analysisResult", JSON.stringify(analysis.result_snapshot));
+      router.push("/analyze");
+    } catch {
+      // silently ignore — user stays on home
+    } finally {
+      setLoadingId(null);
+    }
   }
 
   function formatDate(iso: string) {
@@ -242,18 +258,29 @@ export default function HomePage() {
             <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
               Análisis recientes
             </h2>
-            <ul className="space-y-3">
+            <ul className="space-y-2">
               {recentAnalyses.slice(0, 5).map((a) => (
-                <li key={a.id} className="flex items-center justify-between gap-4">
-                  <span className="text-slate-300 text-sm truncate">
-                    {a.job_role ?? "Puesto sin nombre"}
-                  </span>
-                  <div className="flex items-center gap-4 flex-shrink-0">
-                    <span className={`font-semibold text-sm ${scoreColor(a.score)}`}>
-                      {a.score}%
+                <li key={a.id}>
+                  <button
+                    onClick={() => openAnalysis(a.id)}
+                    disabled={loadingId === a.id}
+                    className="w-full flex items-center justify-between gap-4 px-3 py-2 rounded-xl hover:bg-slate-700/50 transition-colors disabled:opacity-60 text-left"
+                  >
+                    <span className="text-slate-300 text-sm truncate">
+                      {a.job_role ?? "Puesto sin nombre"}
                     </span>
-                    <span className="text-slate-500 text-xs">{formatDate(a.created_at)}</span>
-                  </div>
+                    <div className="flex items-center gap-4 flex-shrink-0">
+                      <span className={`font-semibold text-sm ${scoreColor(a.score)}`}>
+                        {a.score}%
+                      </span>
+                      <span className="text-slate-500 text-xs">{formatDate(a.created_at)}</span>
+                      {loadingId === a.id ? (
+                        <span className="inline-block w-3 h-3 border-2 border-slate-400/30 border-t-slate-400 rounded-full animate-spin" />
+                      ) : (
+                        <span className="text-slate-600 text-xs">→</span>
+                      )}
+                    </div>
+                  </button>
                 </li>
               ))}
             </ul>

@@ -4,6 +4,56 @@ Evidence log for the "Uso de Claude Code" rubric criterion.
 
 ---
 
+## Session 6 — 2026-05-22
+
+**Prompt / task summary:**
+Agregar login con Supabase Magic Link para convertir el RLS de "deny-all decorativo" a aislamiento real por usuario (`auth.uid() = user_id`).
+
+**What Claude Code helped with:**
+- Instaló `@supabase/ssr` para manejo de sesiones con cookies en Next.js App Router.
+- Creó migración SQL `003_add_user_id.sql`: agrega columna `user_id uuid REFERENCES auth.users(id)`, elimina la policy `anon_no_access` genérica y la reemplaza por `users_read_own` y `users_insert_own` con `auth.uid() = user_id` — RLS real por usuario.
+- Creó dos clientes Supabase separados: `server/supabase/server.ts` (SSR con JWT del usuario, para DB ops) y `server/supabase/browser.ts` (anon key, solo para auth UI).
+- Creó `middleware.ts` en la raíz: refresca el JWT en cada request y redirige a `/login` si el usuario no está autenticado en rutas protegidas (`/analyze`).
+- Creó `/login` con formulario de Magic Link (email passwordless): sin contraseña, minimal UI, muestra confirmación post-submit.
+- Creó `/auth/callback` route handler: intercambia el `code` de Supabase por sesión con cookies y redirige a `/`.
+- Actualizó `saveAnalysis` para recibir `userId` y pasarlo al INSERT — RLS puede verificar `auth.uid() = user_id`.
+- Actualizó `getRecentAnalyses` para usar el cliente SSR: RLS filtra automáticamente por usuario.
+- Actualizó `/api/analyze` POST: verifica sesión con `getUser()`, devuelve 401 si no autenticado, pasa `user.id` a `saveAnalysis`.
+- Agregó `Header` Server Component con email del usuario y `LogoutButton` Client Component.
+
+**Files created/changed:**
+- `supabase/migrations/003_add_user_id.sql` — nueva migración con user_id y RLS por usuario
+- `src/server/supabase/server.ts` — cliente SSR con JWT del usuario
+- `src/server/supabase/browser.ts` — cliente browser con anon key
+- `middleware.ts` — session refresh + protección de /analyze
+- `src/app/login/page.tsx` — Magic Link login form
+- `src/app/auth/callback/route.ts` — auth code exchange handler
+- `src/server/persistence/analyses.ts` — saveAnalysis(result, userId), getRecentAnalyses vía SSR
+- `src/app/api/analyze/route.ts` — auth check + user_id passthrough
+- `src/app/_components/header.tsx` — header con email del usuario
+- `src/app/_components/logout-button.tsx` — logout client component
+- `src/app/layout.tsx` — agrega Header
+- `src/shared/types/database.ts` — user_id en Row e Insert
+- `src/tests/unit/analyses-mapping.test.ts` — user_id en MOCK_ROW
+
+**Decisions made:**
+- Magic Link (OTP por email) en lugar de OAuth o email+password: mínima complejidad, cero contraseñas que gestionar, ideal para MVP de curso.
+- Cliente SSR para DB ops en lugar de service-role: permite que RLS actúe con `auth.uid()`. El admin client queda solo para el health check.
+- Middleware en lugar de checks en cada page: un solo lugar para proteger rutas, más mantenible.
+- Header como Server Component + LogoutButton como Client Component: aprovecha el modelo híbrido de Next.js App Router — el server lee la sesión sin exponer keys al browser.
+
+**Issue solved:**
+- El test `analyses-mapping.test.ts` fallaba typecheck porque `MOCK_ROW` no tenía `user_id`. Agregado `user_id: "user-uuid-123"` al mock.
+
+**Next step:**
+- Agregar `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` al `.env.local`.
+- Correr migración `003_add_user_id.sql` en el SQL Editor de Supabase.
+- Habilitar Magic Link en Supabase Dashboard → Authentication → Providers → Email → "Enable email confirmations".
+- Probar flujo completo: login → magic link → callback → `/analyze` → análisis guardado con `user_id`.
+- Abrir PR de la rama `feat/supabase-auth` a `main`.
+
+---
+
 ## Session 5 — 2026-05-21
 
 **Prompt / task summary:**

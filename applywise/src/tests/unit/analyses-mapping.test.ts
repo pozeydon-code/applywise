@@ -16,6 +16,7 @@ const MOCK_ROW: AnalysisRow = {
   created_at: "2026-05-18T00:00:00Z",
   job_role: "Frontend Engineer",
   score: 78,
+  user_id: "user-uuid-123",
   result_snapshot: {
     cvProfile: { experience: [], education: [], skills: [], projects: [] },
     jobOffer: { requiredSkills: [], niceToHaveSkills: [], responsibilities: [], keywords: [] },
