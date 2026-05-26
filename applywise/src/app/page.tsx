@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 const PIPELINE_STEPS = [
@@ -18,12 +19,25 @@ type AnalysisSummary = {
   score: number;
 };
 
+type JobUrlImportResponse = {
+  text: string;
+};
+
+function isJobUrlImportResponse(value: unknown): value is JobUrlImportResponse {
+  return typeof value === "object" && value !== null && "text" in value && typeof value.text === "string";
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [jobUrl, setJobUrl] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isImportingJobUrl, setIsImportingJobUrl] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [jobUrlMessage, setJobUrlMessage] = useState<string | null>(null);
+  const [jobUrlPreview, setJobUrlPreview] = useState<string | null>(null);
+  const [jobUrlError, setJobUrlError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [recentAnalyses, setRecentAnalyses] = useState<AnalysisSummary[]>([]);
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -35,7 +49,7 @@ export default function HomePage() {
       .catch(() => {});
   }, []);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!pdfFile || !jobDescription.trim()) return;
 
@@ -100,6 +114,37 @@ export default function HomePage() {
     } finally {
       setIsLoading(false);
       setCurrentStep(0);
+    }
+  }
+
+  async function handleImportJobUrl() {
+    if (!jobUrl.trim() || isImportingJobUrl) return;
+
+    setIsImportingJobUrl(true);
+    setJobUrlMessage(null);
+    setJobUrlPreview(null);
+    setJobUrlError(null);
+
+    try {
+      const res = await fetch("/api/job-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: jobUrl }),
+      });
+      const data: unknown = await res.json();
+
+      if (!res.ok || !isJobUrlImportResponse(data)) {
+        setJobUrlError("No pudimos leer esta página. Pegá el texto manualmente.");
+        return;
+      }
+
+      setJobDescription(data.text);
+      setJobUrlMessage(`Oferta importada. Se cargaron ${data.text.length} caracteres editables.`);
+      setJobUrlPreview(data.text.slice(0, 220));
+    } catch {
+      setJobUrlError("No pudimos leer esta página. Pegá el texto manualmente.");
+    } finally {
+      setIsImportingJobUrl(false);
     }
   }
 
@@ -173,6 +218,50 @@ export default function HomePage() {
           </div>
 
           {/* Job Description */}
+          <div className="space-y-2">
+            <label htmlFor="jobUrl" className="block text-sm font-medium text-slate-300">
+              Importar oferta desde URL
+            </label>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <input
+                id="jobUrl"
+                type="url"
+                value={jobUrl}
+                onChange={(e) => {
+                  setJobUrl(e.target.value);
+                  setJobUrlMessage(null);
+                  setJobUrlPreview(null);
+                  setJobUrlError(null);
+                }}
+                placeholder="https://empresa.com/careers/frontend-engineer"
+                className="min-w-0 flex-1 rounded-xl border border-slate-600 bg-slate-900/60 px-4 py-3 text-sm text-slate-200 placeholder-slate-500 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              <button
+                type="button"
+                onClick={handleImportJobUrl}
+                disabled={!jobUrl.trim() || isImportingJobUrl}
+                className="rounded-xl bg-slate-700 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-500"
+              >
+                {isImportingJobUrl ? "Importando..." : "Importar oferta"}
+              </button>
+            </div>
+            {jobUrlMessage && (
+              <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
+                {jobUrlMessage}
+              </p>
+            )}
+            {jobUrlPreview && (
+              <p className="rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2 text-xs text-slate-400">
+                Vista previa: {jobUrlPreview}{jobUrlPreview.length === 220 ? "..." : ""}
+              </p>
+            )}
+            {jobUrlError && (
+              <p role="status" className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-200">
+                {jobUrlError}
+              </p>
+            )}
+          </div>
+
           <div className="space-y-2">
             <label
               htmlFor="jobDescription"

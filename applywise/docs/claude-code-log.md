@@ -4,6 +4,32 @@ Evidence log for the "Uso de Claude Code" rubric criterion.
 
 ---
 
+## Session 8 — 2026-05-25
+
+**Prompt / task summary:**
+Agregar importación opcional de descripción de puesto desde una URL, manteniendo el textarea manual como fallback.
+
+**What Claude Code helped with:**
+- Creó endpoint server-side `POST /api/job-url` con validación Zod y respuesta amigable ante fallos.
+- Agregó utilidad `src/server/job-url/extract-job-description.ts` para validar URLs, bloquear hosts locales/privados básicos, aplicar timeout/límite de bytes y extraer texto genérico desde JSON-LD `JobPosting` o bloques HTML probables.
+- Actualizó la landing para importar una URL, rellenar el textarea existente y mantenerlo editable si la página bloquea scraping.
+- Agregó tests unitarios determinísticos para validación SSRF básica, limpieza y extracción HTML.
+- Extendió el Page Object/E2E mock para cubrir que la importación llena el textarea sin depender de una web real.
+
+**Files or areas changed:**
+- `src/server/job-url/extract-job-description.ts`, `src/app/api/job-url/route.ts`
+- `src/app/page.tsx`
+- `src/tests/unit/job-url-extraction.test.ts`
+- `src/tests/e2e/home/home-page.ts`, `src/tests/e2e/home/home.spec.ts`
+
+**Decision made / issue solved:**
+- Se eligió extracción best-effort genérica en vez de scraper específico para LinkedIn/Indeed: menos frágil y respeta el fallback manual cuando el sitio bloquea o no expone texto legible.
+
+**Next step:**
+- Validar en CI/entorno con dependencias Playwright instaladas para confirmar el nuevo test E2E mockeado.
+
+---
+
 ## Session 7 — 2026-05-25
 
 **Prompt / task summary:**

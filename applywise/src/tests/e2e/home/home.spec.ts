@@ -18,6 +18,8 @@ test.describe("Landing page", () => {
 
       await expect(home.heading).toBeVisible();
       await expect(home.pdfInput).toBeAttached();
+      await expect(home.jobUrlInput).toBeVisible();
+      await expect(home.importJobUrlButton).toBeVisible();
       await expect(home.jobDescriptionTextarea).toBeVisible();
       await expect(home.analyzeButton).toBeVisible();
     }
@@ -45,6 +47,27 @@ test.describe("Landing page", () => {
       await home.fillJobDescription(JOB_DESCRIPTION);
 
       await expect(home.analyzeButton).toBeEnabled();
+    }
+  );
+
+  test(
+    "importing a job URL fills the manual textarea",
+    { tag: ["@high", "@e2e", "@HOME-E2E-010"] },
+    async ({ page }) => {
+      await page.route("/api/job-url", async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ text: JOB_DESCRIPTION }),
+        });
+      });
+
+      const home = new HomePage(page);
+      await home.goto();
+      await home.importJobDescription("https://jobs.example.com/frontend-engineer");
+
+      await expect(home.jobDescriptionTextarea).toHaveValue(JOB_DESCRIPTION);
+      await expect(page.getByText("Oferta importada")).toBeVisible();
     }
   );
 });
