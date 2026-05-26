@@ -4,6 +4,35 @@ Evidence log for the "Uso de Claude Code" rubric criterion.
 
 ---
 
+## Session 7 — 2026-05-25
+
+**Prompt / task summary:**
+Implementar el "Kit inteligente de postulación": comparación CV antes/después, simulador de entrevista como preguntas probables con respuestas honestas, y export Markdown determinístico.
+
+**What Claude Code helped with:**
+- Extendió el dominio y schemas Zod con `ApplicationKit` y salida robusta para Qwen2.5 7B.
+- Agregó prompt específico del kit con reglas éticas estrictas contra inventar experiencia, empresas, estudios, años, logros, métricas o skills.
+- Conectó una quinta etapa al pipeline SSE de `/api/analyze` y persiste/devuelve `applicationKit` dentro de `AnalysisResult`.
+- Agregó builder puro `buildApplicationKitMarkdown()` para exportar el kit en Markdown determinístico y testeable.
+- Agregó pestaña "Kit de postulación" al dashboard con CV antes/después, mejoras, entrevista probable y botón de copiado Markdown.
+- Actualizó fixture/Page Object/E2E y agregó unit test del Markdown.
+
+**Files or areas changed:**
+- `src/shared/types/domain.ts`, `src/shared/schemas/ai-outputs.ts`
+- `src/features/application-kit/prompts.ts`, `src/features/application-kit/markdown.ts`
+- `src/app/api/analyze/route.ts`, `src/app/page.tsx`, `src/app/analyze/page.tsx`
+- `src/tests/e2e/fixtures/mock-analysis.ts`, `src/tests/e2e/analyze/analyze-page.ts`, `src/tests/e2e/home/home.spec.ts`
+- `src/tests/unit/application-kit-markdown.test.ts`, `src/tests/unit/analyses-mapping.test.ts`
+
+**Decision made / issue solved:**
+- El simulador no es chat en tiempo real: queda como contenido determinístico del kit, más confiable para demo y exportación.
+- El Markdown se genera fuera de React para mantener negocio/exportación testeable y sin acoplarla al componente.
+
+**Next step:**
+- Instalar dependencias del sistema de Playwright localmente (`libnspr4`/`npx playwright install-deps chromium`) o validar en CI, porque el navegador no arranca en este entorno.
+
+---
+
 ## Session 6 — 2026-05-22
 
 **Prompt / task summary:**

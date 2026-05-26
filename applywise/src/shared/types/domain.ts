@@ -46,6 +46,24 @@ export type GeneratedAssets = {
   coverLetter: string;
 };
 
+export type CvComparison = {
+  before: string;
+  after: string;
+  improvements: string[];
+};
+
+export type InterviewQuestion = {
+  question: string;
+  honestAnswer: string;
+  evidence: string;
+};
+
+export type ApplicationKit = {
+  cvComparison: CvComparison;
+  interviewQuestions: InterviewQuestion[];
+  checklist: string[];
+};
+
 export type AnalysisResult = {
   id?: string;
   createdAt?: string;
@@ -53,4 +71,5 @@ export type AnalysisResult = {
   jobOffer: JobOffer;
   matchAnalysis: MatchAnalysis;
   generatedAssets: GeneratedAssets;
+  applicationKit: ApplicationKit;
 };

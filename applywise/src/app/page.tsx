@@ -8,6 +8,7 @@ const PIPELINE_STEPS = [
   "Analizando oferta laboral",
   "Evaluando compatibilidad",
   "Generando assets de carrera",
+  "Armando kit de postulación",
 ];
 
 type AnalysisSummary = {

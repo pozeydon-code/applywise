@@ -3,11 +3,22 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AnalysisResult } from "@/shared/types/domain";
+import { buildApplicationKitMarkdown } from "@/features/application-kit/markdown";
+
+const EMPTY_APPLICATION_KIT: AnalysisResult["applicationKit"] = {
+  cvComparison: {
+    before: "Este análisis fue generado antes de incorporar el kit de postulación.",
+    after: "Volvé a ejecutar el análisis para generar la comparación optimizada.",
+    improvements: [],
+  },
+  interviewQuestions: [],
+  checklist: ["Volver a ejecutar el análisis para generar el kit completo."],
+};
 
 export default function AnalyzePage() {
   const router = useRouter();
   const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [activeTab, setActiveTab] = useState<"match" | "assets">("match");
+  const [activeTab, setActiveTab] = useState<"match" | "assets" | "kit">("match");
 
   useEffect(() => {
     const raw = sessionStorage.getItem("analysisResult");
@@ -67,6 +78,9 @@ export default function AnalyzePage() {
           <TabButton active={activeTab === "assets"} onClick={() => setActiveTab("assets")}>
             Contenido generado
           </TabButton>
+          <TabButton active={activeTab === "kit"} onClick={() => setActiveTab("kit")}>
+            Kit de postulación
+          </TabButton>
         </div>
 
         {activeTab === "match" && (
@@ -85,6 +99,10 @@ export default function AnalyzePage() {
             <TextCard title="LinkedIn About" content={assets.linkedinAbout} />
             <TextCard title="Cover Letter" content={assets.coverLetter} />
           </div>
+        )}
+
+        {activeTab === "kit" && (
+          <ApplicationKitTab result={result} />
         )}
       </div>
     </main>
@@ -194,6 +212,63 @@ function TextCard({ title, content }: { title: string; content: string }) {
         </button>
       </div>
       <p className="text-slate-400 text-sm whitespace-pre-wrap">{content}</p>
+    </div>
+  );
+}
+
+function ApplicationKitTab({ result }: { result: AnalysisResult }) {
+  const [copied, setCopied] = useState(false);
+  const applicationKit = result.applicationKit ?? EMPTY_APPLICATION_KIT;
+  const resultWithKit: AnalysisResult = { ...result, applicationKit };
+
+  function copyMarkdown() {
+    navigator.clipboard.writeText(buildApplicationKitMarkdown(resultWithKit));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 space-y-3">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="font-semibold text-slate-200">Kit inteligente de postulación</h2>
+            <p className="text-slate-500 text-sm">
+              CV antes/después, entrevista probable y exportación Markdown determinística.
+            </p>
+          </div>
+          <button
+            onClick={copyMarkdown}
+            className="shrink-0 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 transition-colors"
+          >
+            {copied ? "Kit copiado" : "Copiar kit Markdown"}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <TextCard title="CV antes" content={applicationKit.cvComparison.before} />
+        <TextCard title="CV después" content={applicationKit.cvComparison.after} />
+      </div>
+
+      <Section title="Mejoras del CV" color="sky" items={applicationKit.cvComparison.improvements} />
+
+      <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 space-y-4">
+        <h3 className="font-semibold text-slate-200">Simulador de entrevista</h3>
+        <div className="space-y-4">
+          {applicationKit.interviewQuestions.map((item, index) => (
+            <article key={`${item.question}-${index}`} className="rounded-lg border border-slate-700 bg-slate-900/50 p-4 space-y-2">
+              <h4 className="font-medium text-slate-100">{item.question}</h4>
+              <p className="text-sm text-slate-400 whitespace-pre-wrap">{item.honestAnswer}</p>
+              <p className="text-xs text-slate-500 whitespace-pre-wrap">
+                Evidencia: {item.evidence}
+              </p>
+            </article>
+          ))}
+        </div>
+      </div>
+
+      <Section title="Checklist final" color="emerald" items={applicationKit.checklist} />
     </div>
   );
 }

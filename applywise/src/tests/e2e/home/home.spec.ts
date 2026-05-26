@@ -115,6 +115,24 @@ test.describe("Analysis flow (mocked API)", () => {
   );
 
   test(
+    "application kit tab shows interview simulator and markdown copy action",
+    { tag: ["@high", "@e2e", "@HOME-E2E-009"] },
+    async ({ page }) => {
+      const home = new HomePage(page);
+      const analyze = new AnalyzePage(page);
+
+      await home.goto();
+      await home.submitForm(SAMPLE_PDF, JOB_DESCRIPTION);
+      await page.waitForURL("/analyze");
+      await analyze.switchToApplicationKitTab();
+
+      await expect(page.getByText("Simulador de entrevista")).toBeVisible();
+      await expect(page.getByText("How have you improved frontend performance")).toBeVisible();
+      await expect(page.getByRole("button", { name: "Copiar kit Markdown" })).toBeVisible();
+    }
+  );
+
+  test(
     "back button returns to landing",
     { tag: ["@medium", "@e2e", "@HOME-E2E-007"] },
     async ({ page }) => {

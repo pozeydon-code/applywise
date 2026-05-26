@@ -59,4 +59,32 @@ export const MOCK_ANALYSIS_RESULT: AnalysisResult = {
     coverLetter:
       "Dear Hiring Manager,\n\nI am excited to apply for the Senior Frontend Engineer position at StartupXYZ. With 4 years of experience building scalable SPAs using React and TypeScript, I am confident in my ability to contribute to your product team.\n\nSincerely,\nAna García",
   },
+  applicationKit: {
+    cvComparison: {
+      before: "Ana's CV presents solid frontend experience but does not explicitly align every section to the Senior Frontend Engineer role.",
+      after: "Ana's CV should foreground React, TypeScript, performance work, mentoring, and product collaboration for StartupXYZ.",
+      improvements: [
+        "Move React and TypeScript impact into the first summary line",
+        "Mention API integration experience only if Ana has real examples",
+      ],
+    },
+    interviewQuestions: [
+      {
+        question: "How have you improved frontend performance in a React application?",
+        honestAnswer:
+          "I can discuss the load-time reduction listed in my CV, explain the context, and avoid claiming metrics beyond the documented 30% improvement.",
+        evidence: "CV achievement: Reduced load time by 30%.",
+      },
+      {
+        question: "What is your experience with GraphQL?",
+        honestAnswer:
+          "GraphQL is not listed in my CV, so I should be transparent and explain related API integration experience if I have it.",
+        evidence: "Match gap: No GraphQL experience listed.",
+      },
+    ],
+    checklist: [
+      "Verify every claim in the CV can be backed with a real example",
+      "Prepare one honest answer for the GraphQL gap",
+    ],
+  },
 };

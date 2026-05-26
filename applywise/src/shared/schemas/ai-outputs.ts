@@ -61,3 +61,19 @@ export const GeneratedAssetsSchema = z.object({
   linkedinAbout: z.string().catch(""),
   coverLetter: z.string().catch(""),
 });
+
+export const ApplicationKitSchema = z.object({
+  cvComparison: z.object({
+    before: z.string().catch(""),
+    after: z.string().catch(""),
+    improvements: safeArray(z.string()),
+  }),
+  interviewQuestions: safeArray(
+    z.object({
+      question: z.string().catch(""),
+      honestAnswer: z.string().catch(""),
+      evidence: z.string().catch(""),
+    })
+  ),
+  checklist: safeArray(z.string()),
+});

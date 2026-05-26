@@ -27,6 +27,11 @@ const MOCK_ROW: AnalysisRow = {
       linkedinAbout: "",
       coverLetter: "",
     },
+    applicationKit: {
+      cvComparison: { before: "", after: "", improvements: [] },
+      interviewQuestions: [],
+      checklist: [],
+    },
   },
 };
 

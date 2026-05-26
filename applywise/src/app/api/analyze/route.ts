@@ -3,10 +3,11 @@ import { extractTextFromPdf } from "@/server/pdf/extract";
 import { getAiProvider } from "@/server/ai";
 import { saveAnalysis } from "@/server/persistence/analyses";
 import { createSupabaseServerClient } from "@/server/supabase/server";
-import { CvProfileSchema, JobOfferSchema, MatchAnalysisSchema, GeneratedAssetsSchema } from "@/shared/schemas/ai-outputs";
+import { CvProfileSchema, JobOfferSchema, MatchAnalysisSchema, GeneratedAssetsSchema, ApplicationKitSchema } from "@/shared/schemas/ai-outputs";
 import { buildCvNormalizationPrompt, buildJobOfferAnalysisPrompt, SYSTEM_NO_FABRICATION } from "@/features/cv-analysis/prompts";
 import { buildMatchPrompt } from "@/features/job-matching/prompts";
 import { buildAssetsPrompt } from "@/features/profile-generation/prompts";
+import { buildApplicationKitPrompt } from "@/features/application-kit/prompts";
 import type { AnalysisResult } from "@/shared/types/domain";
 
 export const maxDuration = 120;
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
 
   return sseStream(async (emit) => {
     try {
-      emit({ type: "progress", step: 1, total: 4, label: "Parseando CV..." });
+      emit({ type: "progress", step: 1, total: 5, label: "Parseando CV..." });
       const cvProfile = await ai.generateJson({
         prompt: buildCvNormalizationPrompt(pdfResult.text),
         systemPrompt: SYSTEM_NO_FABRICATION,
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
         maxTokens: 2048,
       });
 
-      emit({ type: "progress", step: 2, total: 4, label: "Analizando oferta laboral..." });
+      emit({ type: "progress", step: 2, total: 5, label: "Analizando oferta laboral..." });
       const jobOffer = await ai.generateJson({
         prompt: buildJobOfferAnalysisPrompt(jobDescription),
         systemPrompt: SYSTEM_NO_FABRICATION,
@@ -92,7 +93,7 @@ export async function POST(req: NextRequest) {
         maxTokens: 1024,
       });
 
-      emit({ type: "progress", step: 3, total: 4, label: "Evaluando compatibilidad..." });
+      emit({ type: "progress", step: 3, total: 5, label: "Evaluando compatibilidad..." });
       const matchAnalysis = await ai.generateJson({
         prompt: buildMatchPrompt(cvProfile, jobOffer),
         systemPrompt: SYSTEM_NO_FABRICATION,
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
         maxTokens: 1024,
       });
 
-      emit({ type: "progress", step: 4, total: 4, label: "Generando assets de carrera..." });
+      emit({ type: "progress", step: 4, total: 5, label: "Generando assets de carrera..." });
       const generatedAssets = await ai.generateJson({
         prompt: buildAssetsPrompt(cvProfile, jobOffer, matchAnalysis),
         systemPrompt: SYSTEM_NO_FABRICATION,
@@ -108,7 +109,15 @@ export async function POST(req: NextRequest) {
         maxTokens: 2048,
       });
 
-      const result: AnalysisResult = { cvProfile, jobOffer, matchAnalysis, generatedAssets };
+      emit({ type: "progress", step: 5, total: 5, label: "Armando kit de postulación..." });
+      const applicationKit = await ai.generateJson({
+        prompt: buildApplicationKitPrompt(cvProfile, jobOffer, matchAnalysis, generatedAssets),
+        systemPrompt: SYSTEM_NO_FABRICATION,
+        schema: ApplicationKitSchema,
+        maxTokens: 2048,
+      });
+
+      const result: AnalysisResult = { cvProfile, jobOffer, matchAnalysis, generatedAssets, applicationKit };
 
       const saved = await saveAnalysis(result, user.id);
       if (saved?.id) {
