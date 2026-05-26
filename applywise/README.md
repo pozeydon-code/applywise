@@ -1,8 +1,16 @@
 # ApplyWise
 
-Intelligent CV, LinkedIn, and cover letter optimization powered by a local AI model.
+Intelligent CV, LinkedIn, cover letter, and interview preparation powered by a local AI model.
 
-Upload your PDF CV, paste a job description, and get a compatibility analysis with actionable recommendations — all processed locally, no paid APIs required.
+Upload your PDF CV, paste or import a job description URL, and get a compatibility analysis with actionable recommendations plus an application kit — all processed locally, no paid APIs required.
+
+## Product flow
+
+1. Upload a PDF CV.
+2. Paste a job description or import it from a job posting URL.
+3. Run the local AI pipeline.
+4. Review the compatibility dashboard.
+5. Use the application kit: CV before/after, LinkedIn content, cover letter, interview questions, and Markdown export.
 
 ---
 
@@ -126,14 +134,17 @@ src/
 │   ├── analyze/            # Results dashboard
 │   ├── api/analyze/        # Analysis pipeline (SSE endpoint)
 │   ├── api/analyses/       # CRUD for saved analyses
+│   ├── api/job-url/        # Job posting URL import endpoint
 │   ├── auth/callback/      # Supabase Magic Link callback
 │   └── login/              # Authentication page
 ├── features/               # AI prompts per domain
+│   ├── application-kit/     # Application kit prompt + Markdown export
 │   ├── cv-analysis/
 │   ├── job-matching/
 │   └── profile-generation/
 ├── server/                 # Server-only business logic
 │   ├── ai/                 # AiProvider interface + OllamaProvider + MockProvider
+│   ├── job-url/            # Job URL extraction and cleanup
 │   ├── pdf/                # PDF text extraction
 │   ├── persistence/        # Supabase data access layer
 │   └── supabase/           # SSR and browser Supabase clients
@@ -152,14 +163,18 @@ The analysis runs as a staged pipeline to keep the 7B model focused:
 ```
 PDF upload
   → extract text (server-side)
+  → optional job URL import and cleanup (server-side)
   → normalize CV structure (AI)
   → parse job requirements (AI)
   → match evaluation: score + strengths + gaps + keywords (AI)
   → generate assets: summary + LinkedIn + cover letter (AI)
+  → build application kit: before/after comparison + interview prep (AI)
   → save snapshot to Supabase
 ```
 
 Progress is streamed to the client in real time via Server-Sent Events.
+
+The Markdown export is generated deterministically in code from the validated analysis result, not by asking the model to format final Markdown.
 
 ---
 
@@ -168,6 +183,7 @@ Progress is streamed to the client in real time via Server-Sent Events.
 - RLS is enabled on every table. Authenticated users can only read and write their own rows.
 - The service-role key is server-only and never sent to the browser.
 - All analysis API routes verify the authenticated user before processing.
+- Job posting URL import runs server-side with best-effort URL validation and graceful fallback to manual paste.
 - Raw CV PDFs are not stored — only the analysis result snapshot is persisted.
 
 ---

@@ -8,6 +8,16 @@ const SAMPLE_PDF = path.join(__dirname, "../fixtures/sample.pdf");
 const JOB_DESCRIPTION =
   "We are looking for a Senior Frontend Engineer with experience in React and TypeScript.";
 
+test.beforeEach(async ({ page }) => {
+  await page.route("/api/analyses", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ analyses: [] }),
+    });
+  });
+});
+
 test.describe("Landing page", () => {
   test(
     "renders key elements",

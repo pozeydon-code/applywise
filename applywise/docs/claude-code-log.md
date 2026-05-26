@@ -4,6 +4,29 @@ Evidence log for the "Uso de Claude Code" rubric criterion.
 
 ---
 
+## Session 9 — 2026-05-26
+
+**Prompt / task summary:**
+Corregir fallo de E2E en CI después de pushear a `main`.
+
+**What Claude Code helped with:**
+- Detectó que el middleware de Supabase protegía `/` durante Playwright, mientras los E2E esperan entrar directo a la landing.
+- Agregó bypass de middleware solo cuando `AI_MOCK=true`, que es el modo usado por CI para pruebas E2E sin Ollama ni sesión real.
+- Mockeó `/api/analyses` en Playwright para que la landing no dependa de Supabase al cargar análisis recientes.
+
+**Files or areas changed:**
+- `src/middleware.ts`
+- `src/tests/e2e/home/home.spec.ts`
+- `docs/claude-code-log.md`
+
+**Decision made / issue solved:**
+- El bypass queda limitado al entorno mock de E2E. Producción sigue protegida por Supabase Auth y RLS.
+
+**Next step:**
+- Ejecutar CI o Playwright en un entorno con dependencias de Chromium instaladas.
+
+---
+
 ## Session 8 — 2026-05-25
 
 **Prompt / task summary:**
